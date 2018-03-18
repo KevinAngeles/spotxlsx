@@ -6,7 +6,7 @@ const userSchema = new Schema({
 	spotifyId: {type: String},
 	accessToken: {type: String},
 	refreshToken: {type: String},
-	expires_in: {type: Number}
+	expiration_date: { type: Date }
 });
 
 let User = mongoose.model('User', userSchema);

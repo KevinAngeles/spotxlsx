@@ -9,6 +9,7 @@ const methodOverride = require('method-override');
 const session = require('express-session');
 const passport = require('passport');
 const SpotifyStrategy = require('passport-spotify').Strategy;
+const moment = require('moment');
 require('dotenv').config();
 
 const index = require('./routes/index');
@@ -57,34 +58,33 @@ passport.use(new SpotifyStrategy({
 	function(accessToken, refreshToken, expires_in, profile, done) {
 		// asynchronous verification, for effect...
 		process.nextTick(function () {
-			console.log(`APP LOG: accessToken is ${accessToken} refreshToken is ${refreshToken}`);
 			// The user's spotify profile is returned to
 			// represent the logged-in user.
 			User.findOne({spotifyId: profile.id}, function(err,obj) {
 				if (err) throw err;
+				let new_expiration_date = moment().add(expires_in, 'seconds'); 
 				if (!obj) {
 					let spotifyUser = new User({
 						_id: mongoose.Types.ObjectId(),
 						spotifyId: profile.id,
 						accessToken: accessToken,
 						refreshToken: refreshToken,
-						expires_in: expires_in
+						expiration_date: new_expiration_date
 					});
-					//save
+					// Save user
 					spotifyUser.save(function(er, usr){
 						if (er) throw er;
-						console.log('Spotify user saved.');
 					});
 				}
 				else {
 					let spotifyUser = new User({
 						accessToken: accessToken,
-						refreshToken: refreshToken
+						refreshToken: refreshToken,
+						expiration_date: new_expiration_date
 					});
-					//update
+					// Update user
 					User.update({spotifyId: profile.id}, spotifyUser, function(er, usr) {
 						if (err) throw err;
-						console.log('Spotify user updated.');
 					});
 				}
 				return done(null, profile);
@@ -128,8 +128,9 @@ app.use('/login', login);
 //   request. The first step in spotify authentication will involve redirecting
 //   the user to spotify.com. After authorization, spotify will redirect the user
 //   back to this application at /auth/spotify/callback
+//   The permission dialog won't be displayed if the user has already given permission before to this application
 app.get('/auth/spotify',
-	passport.authenticate('spotify', {scope: ['user-read-email', 'user-read-private', 'playlist-read-private', 'playlist-read-collaborative'], showDialog: true}),
+	passport.authenticate('spotify', {scope: ['user-read-email', 'user-read-private', 'playlist-read-private', 'playlist-read-collaborative'], showDialog: false}),
 	function(req, res){
 // The request will be redirected to spotify for authentication, so this
 // function will not be called.
