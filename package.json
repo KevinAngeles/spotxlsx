@@ -1,6 +1,6 @@
 {
 	"name": "spotxlsx",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Application that retrieves an excel file filled with playlists and their respective tracks gathered from an Spotify account.",
 	"main": "app.js",
 	"scripts": {
@@ -27,6 +27,7 @@
 		"express-session": "^1.15.6",
 		"hbs": "~4.0.1",
 		"method-override": "^2.3.10",
+		"moment": "^2.21.0",
 		"mongoose": "^5.0.10",
 		"morgan": "~1.8.1",
 		"node-sass-middleware": "0.9.8",
