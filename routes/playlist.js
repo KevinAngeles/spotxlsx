@@ -11,6 +11,12 @@ function ensureAuthenticated(req, res, next) {
 	res.redirect('/login');
 }
 
+function getIdFromUrl(playlist_uri) {
+	let init_pos = playlist_uri.indexOf("playlists/") + 10;
+	let end_pos = playlist_uri.indexOf("/tracks");
+	return playlist_uri.slice(init_pos, end_pos);
+}
+
 /* GET home page. */
 router.post('/', ensureAuthenticated, function(req, res, next) {
 	let userid = req.body.userid;
@@ -61,28 +67,64 @@ router.post('/', ensureAuthenticated, function(req, res, next) {
 					{
 						playlists[playlistid] = playlists[i]["name"];
 						let axiosurl = `https://api.spotify.com/v1/users/${userid}/playlists/${playlistid}/tracks`;
-						let params = {
+						let config = {
 							headers: {
 				 				'Accept': 'application/json',
 				 				'Content-Type': 'application/json',
 				 				'Authorization': `Bearer ${access_token}`
 				 			}
 					 	};
-						promises.push(axios.get(axiosurl, params));
+					 	// If a playlist has offsets, create multiple requests for that playlist 
+						let offset = 0;
+					 	let leftTracks = playlists[i]["tracks"]["total"];
+						let offseturl = axiosurl + `?offset=${offset}`;
+
+						while (leftTracks > 0) {
+							promises.push(axios.get(offseturl, config));
+							if (leftTracks > 100)
+							{
+								leftTracks -= 100;
+								offset += 100;
+							}
+							else {
+								leftTracks = 0;
+								offset += leftTracks;
+							}
+							offseturl = axiosurl + `?offset=${offset}`;
+						}
+						//promises.push(axios.get(axiosurl, config));
 					}
 				}
 
 				let userplaylists = [];
 				axios.all(promises)
 					.then(axios.spread((...results) => {
-						results.map(r => userplaylists.push(r.data));
+						// Merge playlists with same id
+						let tmp_playlist_id = "";
+						for (let i = 0; i < results.length; i++) {
+							let current_playlist_id = getIdFromUrl(results[i]["data"]["href"]); 
+							if (userplaylists.length === 0) {
+								// First push to userplaylists
+								userplaylists.push(results[i]["data"]);
+								tmp_playlist_id = current_playlist_id;
+							}
+							else {
+								if (tmp_playlist_id === current_playlist_id) {
+									// Add to previous position
+									userplaylists[userplaylists.length - 1]["items"].push(...results[i]["data"]["items"]);
+								}
+								else {
+									// Update new uri
+									tmp_playlist_id = current_playlist_id;
+									userplaylists.push(results[i]["data"]);
+								}
+							}
+						}
+						//results.map(r => userplaylists.push(r.data));
 				})).then( function (e) {
 					for(let j=0; j<userplaylists.length; j++) {
 						let tracks = userplaylists[j]["items"];
-						let playlist_uri = userplaylists[j]["href"];
-						let init_pos = playlist_uri.indexOf("playlists/") + 10;
-						let end_pos = playlist_uri.indexOf("/tracks");
-						let playlistId = playlist_uri.slice(init_pos, end_pos);
+						let playlistId = getIdFromUrl(userplaylists[j]["href"]);
 						let playlistName = playlistNames[playlistId];
 
 						if( tracks.length > 0 )
