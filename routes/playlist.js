@@ -45,7 +45,7 @@ router.post('/', ensureAuthenticated, function(req, res, next) {
 	        size: 12
 	    }
 	});
-	User.findOne({spotifyId: userid}, function(err,usr) {
+	User.findOne({spotifyId: req.user.id}, function(err,usr) {
 		if (err) throw err;
 		if (usr) {
 			let access_token = usr.accessToken;
