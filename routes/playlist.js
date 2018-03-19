@@ -93,8 +93,28 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 				}
 				//results.map(r => userplaylists.push(r.data));
 		})).then( function (e) {
-			writeSheets(userplaylists, playlistNames, wb)
-			wb.write(`${userid}.xlsx`, res);
+			writeSheets(userplaylists, playlistNames, wb);
+			// Get display name of user
+			axios.get(`https://api.spotify.com/v1/users/${userid}`, { 
+				headers: {
+					'Accept': 'application/json',
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${access_token}`
+				}
+			}).then(function(response) {
+				// Get the display_name
+				let display_name = response["data"]["display_name"];
+				let display_name_UTF8 = JSON.parse( JSON.stringify( display_name ) );
+				// Use the userid as xlsx_file_name
+				let xlsx_file_name = userid;
+				// However, if display_name is a non-empty string, use the display_name as xlsx_file_name
+				if (typeof display_name_UTF8 === "string" && display_name_UTF8.trim().length > 0) {
+					// Replace spaces with underscores ("_")
+					xlsx_file_name = display_name_UTF8.replace(/\s+/g,"_");
+				}
+				xlsx_file_name += ".xlsx";
+				wb.write(xlsx_file_name, res);
+			});
 		}).catch(function (error) {
 			console.log(error);
 		});
