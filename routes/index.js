@@ -8,7 +8,7 @@ function ensureAuthenticated(req, res, next) {
 
 /* GET home page. */
 router.get('/', ensureAuthenticated, function(req, res, next) {
-	res.render('index', { title: 'Playlist to XLS', user: req.user });
+	res.render('index', { title: 'Playlist to XLS', userid: req.user.id });
 });
 
 module.exports = router;
