@@ -1,10 +1,9 @@
 const express = require('express');
 const path = require('path');
-const favicon = require('serve-favicon');
+//const favicon = require('serve-favicon');
 const logger = require('morgan');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
-const sassMiddleware = require('node-sass-middleware');
 const methodOverride = require('method-override');
 const session = require('express-session');
 const passport = require('passport');
@@ -12,9 +11,9 @@ const SpotifyStrategy = require('passport-spotify').Strategy;
 const moment = require('moment');
 require('dotenv').config();
 
-const index = require('./routes/index');
-const playlist = require('./routes/playlist');
-const login = require('./routes/login');
+const indexController = require('./routes/index');
+const playlistController = require('./routes/playlist');
+const authController = require('./routes/auth');
 
 const app = express();
 
@@ -23,8 +22,8 @@ const options = {};
 const mongodbUri = process.env.MONGODB_URI || process.env.MY_MONGODB_URI;
 const User = require('./models/user.js');
 mongoose.connect(mongodbUri, options).then(
-  () => { console.log('Successfully connected');/** ready to use. The `mongoose.connect()` promise resolves to undefined. */ },
-  err => { throw err;/** handle initial connection error */ }
+	() => { console.log('Successfully connected');/** ready to use. The `mongoose.connect()` promise resolves to undefined. */ },
+	err => { throw err;/** handle initial connection error */ }
 );
 
 const appKey = process.env.APP_KEY;
@@ -38,12 +37,12 @@ const callbackURL = process.env.CALLBACK_URL;
 //   the user by ID when deserializing. However, since this example does not
 //   have a database of user records, the complete spotify profile is serialized
 //   and deserialized.
-passport.serializeUser(function(user, done) {
-  done(null, user);
+passport.serializeUser( (user, done) => {
+	done(null, user);
 });
 
-passport.deserializeUser(function(obj, done) {
-  done(null, obj);
+passport.deserializeUser( (obj, done) => {
+	done(null, obj);
 });
 
 // Use the SpotifyStrategy within Passport.
@@ -55,12 +54,12 @@ passport.use(new SpotifyStrategy({
 		clientSecret: appSecret,
 		callbackURL: callbackURL
 	},
-	function(accessToken, refreshToken, expires_in, profile, done) {
+	(accessToken, refreshToken, expires_in, profile, done) => {
 		// asynchronous verification, for effect...
-		process.nextTick(function () {
+		process.nextTick( () => {
 			// The user's spotify profile is returned to
 			// represent the logged-in user.
-			User.findOne({spotifyId: profile.id}, function(err,obj) {
+			User.findOne({spotifyId: profile.id}, (err,obj) => {
 				if (err) throw err;
 				let new_expiration_date = moment().add(expires_in, 'seconds'); 
 				if (!obj) {
@@ -72,7 +71,7 @@ passport.use(new SpotifyStrategy({
 						expiration_date: new_expiration_date
 					});
 					// Save user
-					spotifyUser.save(function(er, usr){
+					spotifyUser.save( (er, usr) => {
 						if (er) throw er;
 					});
 				}
@@ -83,7 +82,7 @@ passport.use(new SpotifyStrategy({
 						expiration_date: new_expiration_date
 					});
 					// Update user
-					User.update({spotifyId: profile.id}, spotifyUser, function(er, usr) {
+					User.update({spotifyId: profile.id}, spotifyUser, (er, usr) => {
 						if (err) throw err;
 					});
 				}
@@ -97,7 +96,6 @@ passport.use(new SpotifyStrategy({
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'hbs');
 
-// uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
 app.use(bodyParser.json());
@@ -111,67 +109,42 @@ app.use(session({ secret: process.env.SESSION_SECRET }));
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.use(sassMiddleware({
-	src: path.join(__dirname, 'public'),
-	dest: path.join(__dirname, 'public'),
-	indentedSyntax: true, // true = .sass and false = .scss
-	sourceMap: true
-}));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', index);
-app.use('/playlist', playlist);
-app.use('/login', login);
-
-// GET /auth/spotify
-//   Use passport.authenticate() as route middleware to authenticate the
-//   request. The first step in spotify authentication will involve redirecting
-//   the user to spotify.com. After authorization, spotify will redirect the user
-//   back to this application at /auth/spotify/callback
-//   The permission dialog won't be displayed if the user has already given permission before to this application
-app.get('/auth/spotify',
-	passport.authenticate('spotify', {scope: ['user-read-email', 'user-read-private', 'playlist-read-private', 'playlist-read-collaborative'], showDialog: false}),
-	function(req, res){
-// The request will be redirected to spotify for authentication, so this
-// function will not be called.
-});
-
-// GET /auth/spotify/callback
-//   Use passport.authenticate() as route middleware to authenticate the
-//   request. If authentication fails, the user will be redirected back to the
-//   login page. Otherwise, the primary route function function will be called,
-//   which, in this example, will redirect the user to the home page.
-app.get('/callback',
-	passport.authenticate('spotify', { failureRedirect: '/login' }),
-	function(req, res) {
-		res.redirect('/');
-	}
-);
-
-app.get('/logout', function(req, res){
-	req.logout();
-	res.redirect('/');
-});
-
-// Simple route middleware to ensure user is authenticated.
-//   Use this route middleware on any resource that needs to be protected.  If
-//   the request is authenticated (typically via a persistent login session),
-//   the request will proceed. Otherwise, the user will be redirected to the
-//   login page.
+/**
+ * Summary. Middleware that ensures that the user is authenticated.
+ *
+ * Description. If the request is authenticated, the request proceeds. Otherwise
+ * the user is redirected to the 'login' page.
+ *
+ * @param {Object}   req           Request.
+ * @param {Object}   res           Response.
+ * @param {Function} next          Next.
+ * 
+ * @return {Function} next.
+ */
 function ensureAuthenticated(req, res, next) {
-	if (req.isAuthenticated()) { return next(); }
-	res.redirect('/login');
+	const pathsExcepted = ['/auth/login', '/auth/spotify', '/auth/spotify/callback'];
+	if ( pathsExcepted.includes(req.path) ) { return next(); }
+	if ( req.isAuthenticated() ) { return next(); }
+	res.redirect('/auth/login');
 }
 
+app.use(ensureAuthenticated);
+
+app.use('/', indexController);
+app.use('/playlist', playlistController);
+app.use('/auth', authController);
+
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use( (req, res, next) => {
 	let err = new Error('Not Found');
 	err.status = 404;
 	next(err);
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use( (err, req, res, next) => {
 	// set locals, only providing error in development
 	res.locals.message = err.message;
 	res.locals.error = req.app.get('env') === 'development' ? err : {};
