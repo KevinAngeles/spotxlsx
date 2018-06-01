@@ -79,11 +79,16 @@ npm run start
 
 ## Built With
 
-* [Express](http://expressjs.com/) - Node.js framework used
 * [Axios](https://www.npmjs.com/package/axios) - Promise based HTTP client for the browser and node.js
-* [PassportJS](http://www.passportjs.org/) - Authentication middleware for Node.JS
+* [Express](http://expressjs.com/) - Node.js framework used
+* [Gulp](https://gulpjs.com/) -  Javascript task runner
 * [MongoDB](https://www.mongodb.com/) - NOSQL data base used
 * [Mongoose](http://mongoosejs.com/) - MongoDB object modeling for node.js
+* [PassportJS](http://www.passportjs.org/) - Authentication middleware for Node.JS
+* [React](https://reactjs.org/) - A JavaScript library for building user interfaces
+* [Reactstrap](https://reactstrap.github.io/) - Library to use React Bootstrap 4 components
+* [Webpack](https://webpack.js.org/) -  Module bundler that generates static assets
+
 
 ## Authors
 

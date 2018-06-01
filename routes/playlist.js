@@ -4,20 +4,81 @@ const axios = require('axios');
 const User = require('../models/user.js');
 const moment = require('moment');
 
-// Require library
-let xl = require('excel4node');
+// Require excel library
+const xl = require('excel4node');
 
-function ensureAuthenticated(req, res, next) {
-	if (req.isAuthenticated()) { return next(); }
-	res.redirect('/login');
-}
-
+/**
+ * Summary. Function that extract an Spotify ID from url.
+ *
+ * Description. The function reads a url and detects the initial part of the Spotify ID
+ * as well as the final part of the Spotify ID. Then, it slices the url
+ * to obtain the Spotify ID.
+ *
+ * @param {string}  playlist_uri       URI containing the Spotify Id.
+ * 
+ * @return {string}
+ */
 function getIdFromUrl(playlist_uri) {
 	let init_pos = playlist_uri.indexOf("playlists/") + 10;
 	let end_pos = playlist_uri.indexOf("/tracks");
 	return playlist_uri.slice(init_pos, end_pos);
 }
 
+/**
+ * Summary. Function that returns the name of the file based on the Spotify display name or ID.
+ *
+ * Description. The function makes a get request to Spotify using an ID and an access token
+ * to obtain information about the user. If a display list is not undefined, it becomes the file name.
+ * Otherwise, the Spotify ID is used as a file name. It returns a promise with the file name
+ *
+ * @param {string}    acces_token        Access token required for Spotify request.
+ * @param {string}    userid             Spotify Id.
+ *
+ * @return {Promise<string>} 
+ */
+function getFileName(access_token, userid) {
+	return new Promise( (resolve, reject) => {
+		// Get display name of user
+		axios.get(`https://api.spotify.com/v1/users/${userid}`, { 
+			headers: {
+				'Accept': 'application/json',
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${access_token}`
+			}
+		}).then( response => {
+			// Get the display_name
+			let display_name = response["data"]["display_name"];
+			let display_name_UTF8 = JSON.parse( JSON.stringify( display_name ) );
+			// Use the userid as xlsx_file_name
+			let xlsx_file_name = userid;
+			// However, if display_name is a non-empty string, use the display_name as xlsx_file_name
+			if (typeof display_name_UTF8 === "string" && display_name_UTF8.trim().length > 0) {
+				// Replace spaces with underscores ("_")
+				xlsx_file_name = display_name_UTF8.replace(/\s+/g,"_");
+			}
+			xlsx_file_name += ".xlsx";			
+			resolve(xlsx_file_name);
+		}).catch( error => {
+			reject(error);
+		});
+	});
+}
+
+/**
+ * Summary. Function that writes an excel file with the playlists from an Spotify account.
+ *
+ * Description. The function makes a get request to Spotify using an ID and an access token
+ * to obtain a list of the playlists. Next, for each playlist, it makes another request to
+ * obtain the tracks. Then, it makes another request to get the display name. If the display 
+ * name exists, it is used as the file name. Otherwise, the Spotify ID is used. Finally, it 
+ * writes an excel file with the playlists.
+ *
+ * @param {string}    acces_token        Access token required for Spotify request.
+ * @param {string}    userid             Spotify Id.
+ * @param {Workbook}  wb                 ('excel4node').Workbook() Object.
+ * @param {Object}    res                Response Object.
+ * 
+ */
 function getPlaylistsAndExport(access_token, userid, wb, res) {
 	//Save promises here
 	let promises = [];
@@ -28,7 +89,7 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 			'Content-Type': 'application/json',
 			'Authorization': `Bearer ${access_token}`
 		}
-	}).then(function(response) {
+	}).then( response => {
 		let playlists = response["data"]["items"];
 
 		for(let i=0; i<playlists.length; i++) {
@@ -63,7 +124,6 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 					}
 					offseturl = axiosurl + `?offset=${offset}`;
 				}
-				//promises.push(axios.get(axiosurl, config));
 			}
 		}
 
@@ -91,38 +151,47 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 						}
 					}
 				}
-				//results.map(r => userplaylists.push(r.data));
-		})).then( function (e) {
+		})).then( e => {
 			writeSheets(userplaylists, playlistNames, wb);
-			// Get display name of user
-			axios.get(`https://api.spotify.com/v1/users/${userid}`, { 
-				headers: {
-					'Accept': 'application/json',
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${access_token}`
-				}
-			}).then(function(response) {
-				// Get the display_name
-				let display_name = response["data"]["display_name"];
-				let display_name_UTF8 = JSON.parse( JSON.stringify( display_name ) );
-				// Use the userid as xlsx_file_name
-				let xlsx_file_name = userid;
-				// However, if display_name is a non-empty string, use the display_name as xlsx_file_name
-				if (typeof display_name_UTF8 === "string" && display_name_UTF8.trim().length > 0) {
-					// Replace spaces with underscores ("_")
-					xlsx_file_name = display_name_UTF8.replace(/\s+/g,"_");
-				}
-				xlsx_file_name += ".xlsx";
+			getFileName(access_token, userid).then( xlsx_file_name => {
 				wb.write(xlsx_file_name, res);
+			}).catch( error => {
+				// Error
+				if (error.response) {
+					// The request was made and the server responded with a status code
+					// that falls out of the range of 2xx
+					// console.log(error.response.data);
+					// console.log(error.response.status);
+					// console.log(error.response.headers);
+				} else if (error.request) {
+					// The request was made but no response was received
+					// `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+					// http.ClientRequest in node.js
+					console.log(error.request);
+				} else {
+					// Something happened in setting up the request that triggered an Error
+					console.log('Error', error.message);
+				}
+				return res.status(error.response.status || 500).send("Error: Id Not Found");
 			});
-		}).catch(function (error) {
+		}).catch( error => {
 			console.log(error);
 		});
-	}).catch(function (error) {
+	}).catch( error => {
 		console.log(error);
 	});
 }
 
+/**
+ * Summary. Function that writes an excel file from a list of playlists.
+ *
+ * Description. This function uses a list of playlists to write each playlist in a page. 
+ *
+ * @param {[Object]}   userplaylists        Array of Playlists.
+ * @param {[Object]}   playlistNames        Array of objects containing Playlist IDs and Names.
+ * @param {Workbook}   wb                   ('excel4node').Workbook() Object.
+ * 
+ */
 function writeSheets(userplaylists, playlistNames, wb) {
 	// Create a reusable style
 	let headerStyle = wb.createStyle({
@@ -146,54 +215,65 @@ function writeSheets(userplaylists, playlistNames, wb) {
 	    }
 	});
 
-	for(let j=0; j<userplaylists.length; j++) {
-		let tracks = userplaylists[j]["items"];
-		let playlistId = getIdFromUrl(userplaylists[j]["href"]);
-		let playlistName = playlistNames[playlistId];
+	// If there is at least one playlist
+	if (userplaylists.length > 0) {
+		for(let j=0; j<userplaylists.length; j++) {
+			let tracks = userplaylists[j]["items"];
+			let playlistId = getIdFromUrl(userplaylists[j]["href"]);
+			let playlistName = playlistNames[playlistId];
 
-		if( tracks.length > 0 )
-		{
-			// Add Worksheets to the workbook
-			let ws = wb.addWorksheet(playlistName);
+			if( tracks.length > 0 )
+			{
+				// Add Worksheets to the workbook
+				let ws = wb.addWorksheet(playlistName);
 
-			// Set value of cells A1:A4 to playlistName styled with paramaters of style
-			ws.cell(1,1,1,4,true).string(playlistName).style(headerStyle);
-			 
-			// Set style to headers
-			ws.cell(2,1).string('Artist').style(headerStyle);
-			ws.cell(2,2).string('Track').style(headerStyle);
-			ws.cell(2,3).string('Spotify URL').style(headerStyle);
-			ws.cell(2,4).string('Added at').style(headerStyle);
-			 
-			let trackRow = 3;
-			// Set value of songs to cells and style them with paramaters of style
-			tracks.forEach(function(track) {
-				if( track["is_local"] === false )
-				{
-					let song = track["track"]["name"];
-					let artist = track["track"]["artists"][0]["name"];
-					let url = track["track"]["external_urls"]["spotify"];
-					let addedAt = track["added_at"];
-					ws.cell(trackRow,1).string(song).style(normalStyle);
-					ws.cell(trackRow,2).string(artist).style(normalStyle);
-					ws.cell(trackRow,3).link(url).style(linkStyle);
-					ws.cell(trackRow,4).string(addedAt).style(normalStyle);
-					trackRow++;
-				}
-			});
-		}
-		else
-		{
-			console.log("No tracks in this list.");
+				// Set value of cells A1:A4 to playlistName styled with paramaters of style
+				ws.cell(1,1,1,4,true).string(playlistName).style(headerStyle);
+				 
+				// Set style to headers
+				ws.cell(2,1).string('Artist').style(headerStyle);
+				ws.cell(2,2).string('Track').style(headerStyle);
+				ws.cell(2,3).string('Spotify URL').style(headerStyle);
+				ws.cell(2,4).string('Added at').style(headerStyle);
+				 
+				let trackRow = 3;
+				// Set value of songs to cells and style them with paramaters of style
+				tracks.forEach( track => {
+					if( track["is_local"] === false )
+					{
+						let song = track["track"]["name"];
+						let artist = track["track"]["artists"][0]["name"];
+						let url = track["track"]["external_urls"]["spotify"];
+						let addedAt = track["added_at"];
+						ws.cell(trackRow,1).string(song).style(normalStyle);
+						ws.cell(trackRow,2).string(artist).style(normalStyle);
+						ws.cell(trackRow,3).link(url).style(linkStyle);
+						ws.cell(trackRow,4).string(addedAt).style(normalStyle);
+						trackRow++;
+					}
+				});
+			}
+			else
+			{
+				console.log("No tracks in this list.");
+			}
 		}
 	}
+	// If there are no playlists
+	else {
+		let ws = wb.addWorksheet("No Playlists");
+		ws.cell(1,1,1,4,true).string("This account has not playlists").style(headerStyle);
+	}
 }
-/* GET home page. */
-router.post('/', ensureAuthenticated, function(req, res, next) {
+
+// POST /playlist
+router.post('/', (req, res, next) => {
+	// Spotify user Id TO SEARCH
 	let userid = req.body.userid;
 	let wb = new xl.Workbook();
 	
-	User.findOne({spotifyId: req.user.id}, function(err,usr) {
+	// Search in the database the access_token of the user CURRENTLY LOGGED into the application
+	User.findOne({spotifyId: req.user.id}, (err, usr) => {
 		if (err) throw err;
 		if (usr) {
 			// Subtract one minute from the expiration_date in order to have more time to renew the access_token
@@ -223,7 +303,7 @@ router.post('/', ensureAuthenticated, function(req, res, next) {
 						"Content-Type" : "application/x-www-form-urlencoded",
 						'Authorization': authorization_code
 					}
-				}).then(function(response) {
+				}).then( response => {
 					// Get the access token from the response
 					access_token = response.data.access_token;
 					let spotifyUser = {
@@ -234,12 +314,12 @@ router.post('/', ensureAuthenticated, function(req, res, next) {
 					if (response.data.hasOwnProperty("refresh_token"))
 						spotifyUser['refreshToken'] = response.data.refresh_token;
 					// Update token data in the database
-					User.update({spotifyId: req.user.id}, spotifyUser, function(er, usr) {
+					User.update({spotifyId: req.user.id}, spotifyUser, (er, usr) => {
 						if (er) throw er;
 						getPlaylistsAndExport(access_token, userid, wb, res);
 					});
-				}).catch(function (error) {
-					console.log(error);
+				}).catch( error => {
+					console.log(error.message);
 				});
 			}
 		}

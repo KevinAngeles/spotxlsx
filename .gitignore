@@ -20,7 +20,7 @@ coverage
 .lock-wscript
 
 # Compiled binary addons (http://nodejs.org/api/addons.html)
-build/Release
+dist
 
 # Dependency directory
 # https://docs.npmjs.com/cli/shrinkwrap#caveats
@@ -31,3 +31,6 @@ npm-debug.log
 
 # Misc
 .env
+
+# Generated stylesheets
+public/stylesheets/
