@@ -131,7 +131,7 @@ class App extends Component {
 				</div>
 				<Row>
 					<Col xs={{ size: '1'}} sm={{ size: '2'}} md={{ size: '3'}} lg={{ size: '4'}}></Col>
-					<Col xs={{ size: '10'}} md={{ size: '6'}} lg={{ size: '4'}} className="bg-light p-4">
+					<Col xs={{ size: '10'}} sm={{ size:'8'}} md={{ size: '6'}} lg={{ size: '4'}} className="bg-light p-4">
 						<h2 className="mb-3">Select Source:</h2>
 						<Form id="myForm" action="/playlist" method="post">
 							<input type="hidden" id="huserid" name="userid" value={this.state.hiddenUserID}/>
