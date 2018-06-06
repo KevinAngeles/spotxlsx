@@ -8,7 +8,7 @@ const sourcemaps   = require('gulp-sourcemaps');
 // Start Watching: Run "gulp"
 gulp.task('default', ['watch']);
 
-const onError = err => {
+const onError = function(err) {
 	notify.onError({
 		title:    "Error",
 		message:  "<%= error %>",
@@ -21,6 +21,9 @@ gulp.task('buildcss', () => {
 	const autoprefixerOptions = { browsers: ['last 2 versions'] };
 	const plumberOptions = { errorHandler: onError };
 	const sassOptions = { includePaths: [] };
+
+	gulp.src("node_modules/bootstrap/dist/css/bootstrap.min.css")
+		.pipe(gulp.dest('./public/stylesheets/', {overwrite: true}))
 
 	return gulp.src('src/sass/**/*.sass')
 		.pipe(plumber(plumberOptions))
