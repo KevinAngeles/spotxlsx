@@ -1,2 +1,27 @@
-<h1>{{title}}</h1>
-<a href="/auth/spotify">Login with Spotify</a>
+<noscript>
+	You need to enable JavaScript to run this app.
+</noscript>
+<div id="root">
+	<div class="container">
+		<div class="py-5 text-center">
+			<h1>Playlists to XLSX</h1>
+			<p class="lead">Retrieve a list of tracks from Spotify in a .xslx file</p>
+			<img src="/images/spotxlsx2.jpg" alt="application logo" style="height: 100px;">
+		</div>
+		<div class="row">
+			<div class="col-1 col-sm-2 col-md-3 col-lg-4"></div>
+			<div class="bg-light p-4 col-10 col-md-6 col-lg-4">
+				<h2 class="mb-3 text-center">Login</h2>
+				<p class="text-center">To begin, click on the button below.</p>
+				<form id="myForm" action="/auth/spotify" method="get" class="">
+					<div class="form-group">
+						<button type="submit" id="btnDownload" class="btn btn-primary btn-md btn-block">Login to Spotify</button>
+					</div>
+				</form>
+			</div>
+			<div class="col-1 col-sm-2 col-md-3 col-lg-4"></div>
+		</div>
+		<footer class="text-center"></footer>
+	</div>
+</div>
+<link rel="stylesheet" href="/stylesheets/bootstrap.min.css">
