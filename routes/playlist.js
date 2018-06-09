@@ -8,6 +8,45 @@ const moment = require('moment');
 const xl = require('excel4node');
 
 /**
+ * Summary. Function that handle errors.
+ *
+ * Description. The function detects if it is a http error, request error
+ * or other type of error. Then, it logs the error. Finally, if a response object was included
+ * in the parameter, it responds with a status code and an optional custom message.
+ * 
+ *
+ * @param {Object}  error     Error object.
+ * @param {Object}  res       Response object.
+ * @param {string}  msg       Custom error message.
+ * 
+ * @return {Response}
+ */
+const handleError = (error, res, msg) => {
+	let errorStatus = 500;
+	// Error
+	if (error.response) {
+		// The request was made and the server responded with a status code
+		// that falls out of the range of 2xx
+		console.log(error.response.data);
+		console.log(error.response.status);
+		console.log(error.response.headers);
+		errorStatus = error.response.status;
+	} else if (error.request) {
+		// The request was made but no response was received
+		// `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+		// http.ClientRequest in node.js
+		console.log(error.request);
+	} else {
+		// Something happened in setting up the request that triggered an Error
+		console.log('Error', error.message);
+	}
+
+	if (res) {
+		return res.status(errorStatus).send(msg || "There was an error.");
+	}
+}
+
+/**
  * Summary. Function that extract an Spotify ID from url.
  *
  * Description. The function reads a url and detects the initial part of the Spotify ID
@@ -18,25 +57,25 @@ const xl = require('excel4node');
  * 
  * @return {string}
  */
-function getIdFromUrl(playlist_uri) {
+const getIdFromUrl = (playlist_uri) => {
 	let init_pos = playlist_uri.indexOf("playlists/") + 10;
 	let end_pos = playlist_uri.indexOf("/tracks");
 	return playlist_uri.slice(init_pos, end_pos);
 }
 
 /**
- * Summary. Function that returns the name of the file based on the Spotify display name or ID.
+ * Summary. Function that returns a promise with the name of the file based on the Spotify display name or ID.
  *
  * Description. The function makes a get request to Spotify using an ID and an access token
  * to obtain information about the user. If a display list is not undefined, it becomes the file name.
  * Otherwise, the Spotify ID is used as a file name. It returns a promise with the file name
  *
- * @param {string}    acces_token        Access token required for Spotify request.
+ * @param {string}    access_token       Access token required for Spotify request.
  * @param {string}    userid             Spotify Id.
  *
  * @return {Promise<string>} 
  */
-function getFileName(access_token, userid) {
+const getFileName = (access_token, userid) => {
 	return new Promise( (resolve, reject) => {
 		// Get display name of user
 		axios.get(`https://api.spotify.com/v1/users/${userid}`, { 
@@ -65,33 +104,50 @@ function getFileName(access_token, userid) {
 }
 
 /**
- * Summary. Function that writes an excel file with the playlists from an Spotify account.
+ * Summary. Function that returns a promise with an array of playlists from an spotify account.
  *
  * Description. The function makes a get request to Spotify using an ID and an access token
- * to obtain a list of the playlists. Next, for each playlist, it makes another request to
- * obtain the tracks. Then, it makes another request to get the display name. If the display 
- * name exists, it is used as the file name. Otherwise, the Spotify ID is used. Finally, it 
- * writes an excel file with the playlists.
+ * to obtain the playlists of a spotify account. It returns a promise with an array of playlists.
  *
- * @param {string}    acces_token        Access token required for Spotify request.
+ * @param {string}    access_token       Access token required for Spotify request.
  * @param {string}    userid             Spotify Id.
- * @param {Workbook}  wb                 ('excel4node').Workbook() Object.
- * @param {Object}    res                Response Object.
- * 
+ *
+ * @return {Promise<[Object]>}
  */
-function getPlaylistsAndExport(access_token, userid, wb, res) {
-	//Save promises here
-	let promises = [];
-	let playlistNames = {};
-	axios.get(`https://api.spotify.com/v1/users/${userid}/playlists`, { 
-		headers: {
-			'Accept': 'application/json',
-			'Content-Type': 'application/json',
-			'Authorization': `Bearer ${access_token}`
-		}
-	}).then( response => {
-		let playlists = response["data"]["items"];
+const getListOfPlaylists = (access_token, userid) => {
+	return new Promise( (resolve, reject) => {
+		axios.get(`https://api.spotify.com/v1/users/${userid}/playlists`, { 
+			headers: {
+				'Accept': 'application/json',
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${access_token}`
+			}
+		}).then( response => {
+			let playlists = response["data"]["items"];
+			resolve(playlists);
+		}).catch( error => {
+			reject(error);
+		});
+	});
+}
 
+/**
+ * Summary. Function that returns a promise with an array of requests and name for each playlist from an spotify account.
+ *
+ * Description. The function makes a get request to Spotify using an ID and an access token
+ * to each playlist of a spotify account. It returns a promise with an array of promises of each playlist.
+ *
+ * @param {string}    access_token       Access token required for Spotify request.
+ * @param {[Object]}  playlists          Array of objects containing data of each playlist.
+ * @param {string}    userid             Spotify Id.
+ *
+ * @return {Promise<[Promise<Object>]>}
+ */
+const getRequestsPromisesAndNamesForEachPlaylist = (access_token, playlists, userid) => {
+	return new Promise( (resolve, reject) => {
+		// Save promises here
+		let arrPlaylistPromises = [];
+		let playlistNames = {};
 		for(let i=0; i<playlists.length; i++) {
 			let playlistid = playlists[i]["id"];
 			playlistNames[playlistid] = playlists[i]["name"];
@@ -112,7 +168,7 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 				let offseturl = axiosurl + `?offset=${offset}`;
 
 				while (leftTracks > 0) {
-					promises.push(axios.get(offseturl, config));
+					arrPlaylistPromises.push(axios.get(offseturl, config));
 					if (leftTracks > 100)
 					{
 						leftTracks -= 100;
@@ -126,60 +182,78 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
 				}
 			}
 		}
-
-		let userplaylists = [];
-		axios.all(promises)
-			.then(axios.spread((...results) => {
-				// Merge playlists with same id
-				let tmp_playlist_id = "";
-				for (let i = 0; i < results.length; i++) {
-					let current_playlist_id = getIdFromUrl(results[i]["data"]["href"]); 
-					if (userplaylists.length === 0) {
-						// First push to userplaylists
-						userplaylists.push(results[i]["data"]);
-						tmp_playlist_id = current_playlist_id;
-					}
-					else {
-						if (tmp_playlist_id === current_playlist_id) {
-							// Add to previous position
-							userplaylists[userplaylists.length - 1]["items"].push(...results[i]["data"]["items"]);
-						}
-						else {
-							// Update new uri
-							tmp_playlist_id = current_playlist_id;
-							userplaylists.push(results[i]["data"]);
-						}
-					}
-				}
-		})).then( e => {
-			writeSheets(userplaylists, playlistNames, wb);
-			getFileName(access_token, userid).then( xlsx_file_name => {
-				wb.write(xlsx_file_name, res);
-			}).catch( error => {
-				// Error
-				if (error.response) {
-					// The request was made and the server responded with a status code
-					// that falls out of the range of 2xx
-					// console.log(error.response.data);
-					// console.log(error.response.status);
-					// console.log(error.response.headers);
-				} else if (error.request) {
-					// The request was made but no response was received
-					// `error.request` is an instance of XMLHttpRequest in the browser and an instance of
-					// http.ClientRequest in node.js
-					console.log(error.request);
-				} else {
-					// Something happened in setting up the request that triggered an Error
-					console.log('Error', error.message);
-				}
-				return res.status(error.response.status || 500).send("Error: Id Not Found");
-			});
-		}).catch( error => {
-			console.log(error);
-		});
-	}).catch( error => {
-		console.log(error);
+		const playlistsAndNames= {
+			arrPlaylistPromises: arrPlaylistPromises,
+			playlistNames: playlistNames
+		}
+		resolve(playlistsAndNames);
 	});
+}
+
+/**
+ * Summary. Function that writes an excel file with the playlists from an Spotify account.
+ *
+ * Description. The function makes a get request to Spotify using an ID and an access token
+ * to obtain a list of the playlists. Next, for each playlist, it makes another request to
+ * obtain the tracks. Then, it makes another request to get the display name. If the display 
+ * name exists, it is used as the file name. Otherwise, the Spotify ID is used. Finally, it 
+ * writes an excel file with the playlists.
+ *
+ * @param {string}    access_token       Access token required for Spotify request.
+ * @param {string}    userid             Spotify Id.
+ * @param {Workbook}  wb                 ('excel4node').Workbook() Object.
+ * @param {Object}    res                Response Object.
+ * 
+ */
+const getPlaylistsAndExport = (access_token, userid, wb, res) => {
+	getListOfPlaylists(access_token, userid)
+		.then( playlists => {
+			getRequestsPromisesAndNamesForEachPlaylist(access_token, playlists, userid)
+				.then( playlistPromisesAndNames => {
+					const arrPlaylistPromises = playlistPromisesAndNames.arrPlaylistPromises;
+					const playlistNames = playlistPromisesAndNames.playlistNames;
+					let userplaylists = [];
+					axios.all(arrPlaylistPromises)
+						.then( axios.spread( (...results) => {
+							// Merge playlists with same id
+							let tmp_playlist_id = "";
+							for (let i = 0; i < results.length; i++) {
+								let current_playlist_id = getIdFromUrl(results[i]["data"]["href"]); 
+								if (userplaylists.length === 0) {
+									// First push to userplaylists
+									userplaylists.push(results[i]["data"]);
+									tmp_playlist_id = current_playlist_id;
+								}
+								else {
+									if (tmp_playlist_id === current_playlist_id) {
+										// Add to previous position
+										userplaylists[userplaylists.length - 1]["items"].push(...results[i]["data"]["items"]);
+									}
+									else {
+										// Update new uri
+										tmp_playlist_id = current_playlist_id;
+										userplaylists.push(results[i]["data"]);
+									}
+								}
+							}
+						})).then( () => {
+							writeSheets(userplaylists, playlistNames, wb);
+						
+							getFileName(access_token, userid)
+								.then( xlsx_file_name => {
+									wb.write(xlsx_file_name, res);
+								}).catch( error => {
+									handleError(error, res, "Error: Id Not Found");
+								});
+						}).catch( error => {
+							handleError(error, res, "Error: there was a problem with request");
+						});
+				}).catch( error => {
+					handleError(error, res);
+				});
+		}).catch( error => {
+			handleError(error, res);
+		});
 }
 
 /**
@@ -192,7 +266,7 @@ function getPlaylistsAndExport(access_token, userid, wb, res) {
  * @param {Workbook}   wb                   ('excel4node').Workbook() Object.
  * 
  */
-function writeSheets(userplaylists, playlistNames, wb) {
+const writeSheets = (userplaylists, playlistNames, wb) => {
 	// Create a reusable style
 	let headerStyle = wb.createStyle({
 	    font: {
@@ -266,6 +340,7 @@ function writeSheets(userplaylists, playlistNames, wb) {
 	}
 }
 
+
 // POST /playlist
 router.post('/', (req, res, next) => {
 	// Spotify user Id TO SEARCH
@@ -319,12 +394,12 @@ router.post('/', (req, res, next) => {
 						getPlaylistsAndExport(access_token, userid, wb, res);
 					});
 				}).catch( error => {
-					console.log(error.message);
+					handleError(error, res, "Error while processing the tokens.");
 				});
 			}
 		}
 		else {
-			console.log("Error: no access token");
+			handleError(error, res, "Error: no access token");
 		}
 	});
 });
