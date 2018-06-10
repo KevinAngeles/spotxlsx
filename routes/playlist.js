@@ -106,7 +106,7 @@ const getListOfPlaylists = (access_token, user_id) => {
  * @param {[Object]}  playlists          Array of objects containing data of each playlist.
  * @param {string}    user_id            Spotify Id.
  *
- * @return {Promise<[Promise<Object>]>}
+ * @return {Promise<Object[]>}     Promise<Object[{Promise[playlist],{playlistNames}}]>
  */
 const getRequestsPromisesAndNamesForEachPlaylist = (access_token, playlists, user_id) => {
 	return new Promise( (resolve, reject) => {

@@ -101,13 +101,13 @@ const verifyTokenAndGetAccessToken = (spotify_id) => {
 							resolve(access_token);
 						});
 					}).catch( error => {
-						// Error related to the token.
+						console.log("Error: problem with the token.");
 						reject(error);
 					});
 				}
 			}
 			else {
-				// Error: no access token.
+				console.log("Error: no access_token.");
 				reject(error);
 			}
 		});
