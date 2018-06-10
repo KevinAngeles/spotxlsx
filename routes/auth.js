@@ -4,6 +4,9 @@ const axios = require('axios');
 const User = require('../models/user.js');
 const moment = require('moment');
 const passport = require('passport');
+const helper = require('../modules/helper.js');
+const handleError = helper.handleError;
+const verifyTokenAndGetAccessToken = helper.verifyTokenAndGetAccessToken;
 
 /**
  * Summary. Function that validates if a Spotify ID exists.
@@ -13,13 +16,13 @@ const passport = require('passport');
  * is returned indicating the error.
  *
  * @param {String}  acces_token        Access token required for Spotify request.
- * @param {String}  userid             Spotify Id.
+ * @param {String}  user_id            Spotify Id to validate.
  * @param {Object}  res                Response Object.
  * 
  * @return {json} res.json
  */
-function ensureSpotifyUserExists(access_token, userid, res) {
-	axios.get(`https://api.spotify.com/v1/users/${userid}`, { 
+const ensureSpotifyUserExists = (access_token, user_id, res) => {
+	axios.get(`https://api.spotify.com/v1/users/${user_id}`, { 
 		headers: {
 			'Accept': 'application/json',
 			'Content-Type': 'application/json',
@@ -33,67 +36,22 @@ function ensureSpotifyUserExists(access_token, userid, res) {
 			return res.status(404).json({ status: 404, data: "Spotify Id Not Found" });
 		}
 	}).catch( error => {
-		return res.status(error.response.status || 500).json({ status: (error.response.status || 500), data: "Spotify Id Not Found" });
+		handleError(error, res, "Spotify Id Not Found");
 	});
-}
+};
 
 // POST /auth
 router.post('/', (req, res, next) => {
-	let userid = req.body.userid;
-	// Search in the database the access_token of the user CURRENTLY LOGGED into the application
-	User.findOne({spotifyId: req.user.id}, (err, usr) => {
-		if (err) throw err;
-		if (usr) {
-			// Subtract one minute from the expiration_date in order to have more time to renew the access_token
-			let expiration_moment = moment(usr.expiration_date).subtract(1,'minutes');
-			let current_moment = moment();
-			let access_token = usr.accessToken;
-			let refresh_token = usr.refreshToken;
-			if(current_moment <= expiration_moment) {
-				// access_token still is valid
-				ensureSpotifyUserExists(access_token, userid, res);
-			}
-			else {
-				// access_token must be renewed
-				const appKey = process.env.APP_KEY;
-				const appSecret = process.env.APP_SECRET;
-				const authorization_code = "Basic " + (new Buffer(appKey + ':' + appSecret).toString('base64'));
-				// Request new access_token using refresh_token
-				axios({
-					method: 'POST',
-					url: "https://accounts.spotify.com/api/token", 
-					params: {
-						grant_type: 'refresh_token',
-						refresh_token: refresh_token
-					},
-					headers: {
-						"Content-Type" : "application/x-www-form-urlencoded",
-						'Authorization': authorization_code
-					}
-				}).then( response => {
-					// Get the access token from the response
-					access_token = response.data.access_token;
-					let spotifyUser = {
-						accessToken: access_token,
-						expiration_date: moment().add(response.data.expires_in, 'seconds')
-					};
-					// Check if a new refresh_token was provided
-					if (response.data.hasOwnProperty("refresh_token"))
-						spotifyUser['refreshToken'] = response.data.refresh_token;
-					// Update token data in the database
-					User.update({spotifyId: req.user.id}, spotifyUser, (er, usr) => {
-						if (er) throw er;
-						ensureSpotifyUserExists(access_token, userid, res);
-					});
-				}).catch( error => {
-					return res.status(error.response.status || 500).json({ status: (error.response.status || 500), error: 'Error related to the token.' });
-				});
-			}
-		}
-		else {
-			console.log("Error: no access token");
-		}
-	});
+	// Spotify user Id TO SEARCH
+	const user_id = req.body.userid;
+	// Spotify id of the user CURRENTLY LOGGED into the application
+	const spotify_id = req.user.id;
+	verifyTokenAndGetAccessToken(spotify_id)
+		.then( access_token => {
+			ensureSpotifyUserExists(access_token, user_id, res);
+		}).catch( error => {
+			handleError(error);
+		});
 });
 
 // GET /login
@@ -107,7 +65,7 @@ router.get('/logout', (req, res) => {
 	res.redirect('/');
 });
 
-const spotifyScope = ['user-read-email', 'user-read-private', 'playlist-read-private', 'playlist-read-collaborative'];
+const spotify_scope = ['user-read-email', 'user-read-private', 'playlist-read-private', 'playlist-read-collaborative'];
 
 // GET /auth/spotify
 //   Use passport.authenticate() as route middleware to authenticate the
@@ -116,7 +74,7 @@ const spotifyScope = ['user-read-email', 'user-read-private', 'playlist-read-pri
 //   back to this application at /auth/spotify/callback
 //   The permission dialog won't be displayed if the user has already given permission before to this application
 router.get('/spotify', 
-	passport.authenticate('spotify', {scope: spotifyScope, showDialog: false}),
+	passport.authenticate('spotify', {scope: spotify_scope, showDialog: false}),
 	(req, res) => {
 		// The request will be redirected to spotify for authentication, so this
 		// function will not be called.
