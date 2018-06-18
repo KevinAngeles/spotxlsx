@@ -124,6 +124,9 @@ class App extends Component {
 						<Button color="warning" onClick={this.toggle}>OK</Button>
 					</ModalBody>
 				</Modal>
+				<header class="text-right">
+					<a href="/auth/logout">Logout</a>
+				</header>
 				<div className="py-5 text-center">
 					<h1>Playlists to XLSX</h1>
 					<p className="lead">Retrieve a list of tracks from Spotify in a .xslx file</p>
