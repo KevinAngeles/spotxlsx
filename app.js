@@ -144,10 +144,32 @@ app.use(express.static(path.join(__dirname, 'public')));
  * @return {Function} next.
  */
 function ensureAuthenticated(req, res, next) {
-	const pathsExcepted = ['/auth/login', '/auth/spotify', '/auth/spotify/callback'];
-	if ( pathsExcepted.includes(req.path) ) { return next(); }
-	if ( req.isAuthenticated() ) { return next(); }
-	res.redirect('/auth/login');
+	const LOGIN_PATH = '/auth/login';
+	const pathsExcepted = ['/auth/spotify', '/auth/spotify/callback'];
+	// if there is a request to any of the paths in pathsExcepted, continue
+	if ( pathsExcepted.includes(req.path) ) { 
+		console.log(1);
+		return next(); 
+	}
+	// if there is a request to login
+	else if ( req.path === LOGIN_PATH ) {
+		// if user was already authenticated 
+		if ( req.isAuthenticated() ) {
+			// redirect to home page
+			return res.redirect('/');
+		}
+		// if user was not authenticated
+		// continue to login
+		return next();
+	}
+	// if user was authenticated and path is not part of 'pathsExcepted' nor 'LOGIN_PATH'
+	else if ( req.isAuthenticated() ) {
+			// continue
+			return next();
+	}
+	// if user was not authenticated and path is not part of 'pathsExcepted' nor 'LOGIN_PATH'
+	// redirect to login
+	return res.redirect('/auth/login');
 }
 
 app.use(ensureAuthenticated);
