@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const favicons = require('serve-favicons');
-const logger = require('morgan');
+const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const methodOverride = require('method-override');
@@ -113,7 +113,23 @@ app.use(favicons({
 	'/favicon-16x16.png': __dirname + '/public/favicons/favicon-16x16.png',
 	'/ms-icon-144x144.png': __dirname + '/public/favicons/ms-icon-144x144.png'
 }));
-app.use(logger('dev'));
+
+// Log all the responses with status code greater than or equal to 400 and send them to stderr
+// using combined format
+app.use(morgan('combined', {
+	skip: (req, res) => {
+		return res.statusCode < 400
+	}, stream: process.stderr
+}));
+
+// Log all the responses with status code less than 400 and send them to stdout
+// using combined format
+app.use(morgan('combined', {
+	skip: (req, res) => {
+		return res.statusCode >= 400
+	}, stream: process.stdout
+}));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
