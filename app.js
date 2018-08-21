@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const favicons = require('serve-favicons');
 const morgan = require('morgan');
+const logger = require('./logger');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const methodOverride = require('method-override');
@@ -22,8 +23,15 @@ const options = {};
 const mongodbUri = process.env.MONGODB_URI || process.env.MY_MONGODB_URI;
 const User = require('./models/user.js');
 mongoose.connect(mongodbUri, options).then(
-	() => { console.log('Successfully connected');/** ready to use. The `mongoose.connect()` promise resolves to undefined. */ },
-	err => { throw err;/** handle initial connection error */ }
+	() => { 
+		/** ready to use. The `mongoose.connect()` promise resolves to undefined. */
+		logger.info('Successfully connected');
+	},
+	err => { 
+		/** handle initial connection error */
+		logger.error('Unable connect to database');
+		throw err;
+	}
 );
 
 const appKey = process.env.APP_KEY;
@@ -164,7 +172,6 @@ function ensureAuthenticated(req, res, next) {
 	const pathsExcepted = ['/auth/spotify', '/auth/spotify/callback'];
 	// if there is a request to any of the paths in pathsExcepted, continue
 	if ( pathsExcepted.includes(req.path) ) { 
-		console.log(1);
 		return next(); 
 	}
 	// if there is a request to login
@@ -196,6 +203,7 @@ app.use('/auth', authController);
 
 // catch 404 and forward to error handler
 app.use( (req, res, next) => {
+	logger.error('404 page requested');
 	let err = new Error('Not Found');
 	err.status = 404;
 	next(err);
