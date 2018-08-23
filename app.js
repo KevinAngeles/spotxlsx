@@ -122,20 +122,20 @@ app.use(favicons({
 	'/ms-icon-144x144.png': __dirname + '/public/favicons/ms-icon-144x144.png'
 }));
 
-// Log all the responses with status code greater than or equal to 400 and send them to stderr
+// Log all the responses with status code greater than or equal to 400 and send them to winston
 // using combined format
 app.use(morgan('combined', {
 	skip: (req, res) => {
 		return res.statusCode < 400
-	}, stream: process.stderr
+	}, stream: logger.streamHTTPError
 }));
 
-// Log all the responses with status code less than 400 and send them to stdout
+// Log all the responses with status code less than 400 and send them to winston
 // using combined format
 app.use(morgan('combined', {
 	skip: (req, res) => {
 		return res.statusCode >= 400
-	}, stream: process.stdout
+	}, stream: logger.streamHTTPInfo
 }));
 
 app.use(bodyParser.json());
@@ -203,7 +203,7 @@ app.use('/auth', authController);
 
 // catch 404 and forward to error handler
 app.use( (req, res, next) => {
-	logger.error('404 page requested');
+	logger.HTTPerror('404 page requested');
 	let err = new Error('Not Found');
 	err.status = 404;
 	next(err);
