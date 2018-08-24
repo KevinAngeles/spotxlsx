@@ -88,11 +88,12 @@ npm run start
 * [React](https://reactjs.org/) - A JavaScript library for building user interfaces
 * [Reactstrap](https://reactstrap.github.io/) - Library to use React Bootstrap 4 components
 * [Webpack](https://webpack.js.org/) -  Module bundler that generates static assets
+* [Winston](https://github.com/winstonjs/winston) - A logger for just about everything.
 
 
 ## Authors
 
-* **Kevin Angeles** - [spotxlsx](https://github.com/KevinAngeles/spotxlsx)
+* **[Kevin Angeles](https://www.kevinangeles.com/)** - [spotxlsx](https://github.com/KevinAngeles/spotxlsx)
 
 ## License
 
