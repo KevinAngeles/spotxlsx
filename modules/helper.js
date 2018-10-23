@@ -1,6 +1,7 @@
 const axios = require('axios');
 const User = require('../models/user.js');
 const moment = require('moment');
+const logger = require('../logger');
 
 /**
  * Summary. Function that handle errors.
@@ -22,18 +23,20 @@ const handleError = (error, res, msg) => {
 	if (error.response) {
 		// The request was made and the server responded with a status code
 		// that falls out of the range of 2xx
-		console.log(error.response.data);
-		console.log(error.response.status);
-		console.log(error.response.headers);
+		logger.HTTPerror(error.response.data);
+		logger.HTTPerror(error.response.status);
+		logger.HTTPerror(error.response.headers);
+		if (error.stack) logger.HTTPerror(error.stack);
 		error_status = error.response.status;
 	} else if (error.request) {
 		// The request was made but no response was received
 		// `error.request` is an instance of XMLHttpRequest in the browser and an instance of
 		// http.ClientRequest in node.js
-		console.log(error.request);
+		logger.HTTPerror(error.request);
+		if (error.stack) logger.HTTPerror(error.stack);
 	} else {
 		// Something happened in setting up the request that triggered an Error
-		console.log('Error', error.message);
+		(error.stack) ? logger.error(error.stack):logger.error(error.message);
 	}
 
 	if (res) {
