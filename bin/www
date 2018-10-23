@@ -81,6 +81,8 @@ const onListening = () => {
 		? 'pipe ' + addr
 		: 'port ' + addr.port;
 	logger.info('Listening on ' + bind);
+	const loggingLevel = process.env.LOG_LEVEL || 'info';
+	logger.info(`Logging level: ${loggingLevel}`);
 }
 
 /**
