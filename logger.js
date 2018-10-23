@@ -1,8 +1,9 @@
 const moment = require('moment');
 const winston = require("winston");
 require("winston-daily-rotate-file");
+require('dotenv').config();
 
-const level = process.env.LOG_LEVEL || 'debug';
+const level = process.env.LOG_LEVEL || 'info';
 
 const currentMoment = moment().format('YYYY-MM-DDTHH:mm:ss.SSSZZ');
 

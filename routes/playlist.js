@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const User = require('../models/user.js');
 const moment = require('moment');
+const logger = require('../logger');
 
 // Require excel library
 const xl = require('excel4node');
@@ -280,6 +281,7 @@ const writeSheets = (user_playlists, playlist_names, wb) => {
 				tracks.forEach( track => {
 					if( track["is_local"] === false )
 					{
+						logger.debug(track);
 						const song = track["track"]["name"];
 						const artist = track["track"]["artists"][0]["name"];
 						const url = track["track"]["external_urls"]["spotify"];
