@@ -279,9 +279,9 @@ const writeSheets = (user_playlists, playlist_names, wb) => {
 				let track_row = 3;
 				// Set value of songs to cells and style them with paramaters of style
 				tracks.forEach( track => {
-					if( track["is_local"] === false )
+					if( track["is_local"] === false && track["track"])
 					{
-						logger.debug(track);
+						logger.silly(track);
 						const song = track["track"]["name"];
 						const artist = track["track"]["artists"][0]["name"];
 						const url = track["track"]["external_urls"]["spotify"];
