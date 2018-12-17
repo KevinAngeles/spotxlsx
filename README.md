@@ -3,6 +3,8 @@
 
 This application allows users to retrieve an .xlsx file filled with playlists and their respective tracks gathered from an Spotify account.
 
+## Demo
+https://spotxlsx.herokuapp.com/
 
 ## Getting Started
 
@@ -82,7 +84,7 @@ npm run start
 * [Axios](https://www.npmjs.com/package/axios) - Promise based HTTP client for the browser and node.js
 * [Express](http://expressjs.com/) - Node.js framework used
 * [Gulp](https://gulpjs.com/) -  Javascript task runner
-* [MongoDB](https://www.mongodb.com/) - NOSQL data base used
+* [MongoDB](https://www.mongodb.com/) - NoSQL data base used
 * [Mongoose](http://mongoosejs.com/) - MongoDB object modeling for node.js
 * [PassportJS](http://www.passportjs.org/) - Authentication middleware for Node.JS
 * [React](https://reactjs.org/) - A JavaScript library for building user interfaces
