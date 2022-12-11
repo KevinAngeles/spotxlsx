@@ -3,8 +3,9 @@
 
 This application allows users to retrieve an .xlsx file filled with playlists and their respective tracks gathered from an Spotify account.
 
-## Demo
-https://spotxlsx.herokuapp.com/
+## Introduction
+
+This application was originally developed only in JavaScript. Now, it has been updated to also support TypeScript.
 
 ## Getting Started
 
@@ -30,35 +31,33 @@ npm install
 
 This application uses a file to configurate the application port, mongodb uri, Spotify key, Spotify secret, Spotify callback url, and Session secret.
 
-Go to the root of the project, open `.envdefault` in a text editor, and save that file as `.env`
-
-**Set Port**
-
-By default, the application will listen on `process.env.PORT`. However, you can change the port in the `.env` file that you created by setting the variable `SERVER_PORT` to the desired port.
-
-```
-Note: If 'process.env.PORT' was already set, setting 'SERVER_PORT' in '.env' won't have any effect.
-```
+Go to the root of the project, open `.env.backup` in a text editor, and save that file as `.env`
 
 **Set MongoDB URI**
 
-By default, MongoDB will use the URI on `process.env.MONGODB_URI`. However, you can change the MONGODB_URI in the `.env` file by setting the variable MY_MONGODB_URI to the desired port. 
-```
-Note: If 'process.env.MONGODB_URI' was already set, setting 'MY_MONGODB_URI' in '.env' won't have any effect.
-```
+By default, MongoDB will use the URI on `process.env.MONGODB_URI`.
 
 **Set Spotify Keys and Callbacks**
 
-In the `.env` file that you created, set `APP_KEY` to the Spotify client id, `APP_SECRET` to the Spotify secret id, and `CALLBACK_URL` to the Spotify callback url.
+In the `.env` file that you created, set `SPOTIFY_CLIENT_ID` to the Spotify client id, `SPOTIFY_CLIENT_SECRET` to the Spotify secret id, and `CALLBACK_URL` to the Spotify callback url.
+
+**Set NEXTAUTH_SECRET**
+
+The secret will be used on production mode.
+
+**Set NEXTAUTH_URL**
+
+If the application will be run on a local server, go to the `.env` file that you created, set NEXTAUTH_URL to the localhost url (I.E. http://localhost:3000)
+
+Likewise, if the application will be run on a remote server, go to the `.env` file and set NEXTAUTH_URL to the remote url.
 
 **Set Session Secret**
 
 In order to make the sessions more secure, go to the `.env` file that you created and set `SESSION_SECRET` to any secure phrase.
 
+**Starti MongoDB**
 
-## Deployment
-
-**Start MongoDB**
+If your are planning to use remote MongoDB connection, skip this step.
 
 This step varies depending on how MongoDB was installed.
 
@@ -72,7 +71,27 @@ mongod
 
 For more information visit [MongoDB documentation](https://docs.mongodb.com/)
 
+## Run in development mode
+
+Go to the `.env` file that you created and set `NODE_ENV` to `development`. Then, run the command:
+```
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Deployment
+
+**Build the files**
+
+Go to the root of the project and run the following code:
+
+```
+npm run build
+```
+
 **Start the server**
+
 Go to the root of the project and run the following code:
 
 ```
@@ -81,17 +100,13 @@ npm run start
 
 ## Built With
 
-* [Axios](https://www.npmjs.com/package/axios) - Promise based HTTP client for the browser and node.js
-* [Express](http://expressjs.com/) - Node.js framework used
-* [Gulp](https://gulpjs.com/) -  Javascript task runner
+* [Next.js](https://nextjs.org/) - React framework that gives you building blocks to create web applications
+* [NextAuth.js](https://next-auth.js.org/) - Open source authentication library
 * [MongoDB](https://www.mongodb.com/) - NoSQL data base used
-* [Mongoose](http://mongoosejs.com/) - MongoDB object modeling for node.js
-* [PassportJS](http://www.passportjs.org/) - Authentication middleware for Node.JS
+* [Material UI](https://mui.com/) - Comprehensive suite of UI tools to help you ship new features faster
 * [React](https://reactjs.org/) - A JavaScript library for building user interfaces
-* [Reactstrap](https://reactstrap.github.io/) - Library to use React Bootstrap 4 components
-* [Webpack](https://webpack.js.org/) -  Module bundler that generates static assets
-* [Winston](https://github.com/winstonjs/winston) - A logger for just about everything.
-
+* [Excel4node](https://www.npmjs.com/package/excel4node) - A full featured xlsx file generation library allowing for the creation of advanced Excel files
+* [TypeScript](https://www.typescriptlang.org/) - Strongly typed programming language that builds on JavaScript
 
 ## Authors
 
