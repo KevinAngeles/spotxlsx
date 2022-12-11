@@ -45,7 +45,7 @@ export const getAccessAndRefreshToken = async (refresh_token: string, app_key: s
     return {
       newAccessToken: newAccessToken,
       newRefreshToken: (typeof newRefreshToken === 'string' && newRefreshToken !== '') ? newRefreshToken : null,
-      newExpirationDate: (typeof newExpirationDate === 'number') ?  newExpirationDate : null,
+      newExpirationDate: (typeof newExpirationDate === 'number') ? Date.now() + newExpirationDate * 1000 : null,
     };
   } catch(error) {
     const errorMessage = getErrorMessage(error);
