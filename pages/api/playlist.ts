@@ -2,11 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { TJsonError, TPlaylist, TPlaylists, TPlaylistTracks } from '@/types/types';
 import { assertIsJsonError, getErrorMessage } from '@/utils/errorHandler';
 import { getSession } from 'next-auth/react';
-import xl, { Workbook } from 'excel4node';
 import { getMongoDb } from '@/lib/mongodb';
 import { findAccountById } from '@/lib/db/account';
 import AccountModel from '@/lib/models/AccountModel';
-import { refreshSpotifyToken, createSpotifyUserExistsJSON } from '@/utils/index';
+import { refreshSpotifyToken, createSpotifyUserExistsJSON, parseStringToUTF8, parseWorksheetName } from '@/utils/index';
+import xl, { Workbook } from 'excel4node';
 
 /**
  * Summary. Function that returns a promise with an array of playlists from an spotify account.
@@ -83,20 +83,19 @@ const getIdFromUrl = (playlist_uri: string) => {
  * @param {TPlaylist[]}  playlists       Array of objects containing data of each playlist.
  * @param {string}       user_id         Spotify Id.
  *
- * @return Promise<Object[{Promise[playlist],{playlistNames}}]>
+ * @return Promise on a object that contains an array promise responses and
+ *  object where the key is the playlistId and the value is the playlistName
  */
 const getRequestsPromisesAndNamesForEachPlaylist = async (access_token: string, playlists: TPlaylist[], user_id: string): Promise<{
   playlistsRequestPromises: Promise<Response>[],
   playlistNames: { [playlistId: string]: string }
 }> => {
-  // Save promises here
   let playlistURLConfig: TPlaylistUrlConfig[] = [];
   let playlistNames = {} as {[k: string]: string};
   for(let i=0; i < playlists.length; i++) {
     let playlist_id = playlists[i]['id'];
     playlistNames[playlist_id] = playlists[i]['name'];
     if (playlists[i]['owner']['id'] === user_id) {
-      // playlists[playlist_id] = playlists[i]['name'];
       const spotifyApiBaseUrl = 'https://api.spotify.com/v1';
       const spotifyPlaylistParams = (user_id === '') ? `/playlists/${playlist_id}/tracks` : `/users/${user_id}/playlists/${playlist_id}/tracks`;
       const playlistUrl = `${spotifyApiBaseUrl}${spotifyPlaylistParams}`;
@@ -125,6 +124,7 @@ const getRequestsPromisesAndNamesForEachPlaylist = async (access_token: string, 
       }
     }
   }
+  // Save promises here
   const playlistsRequestPromises = playlistURLConfig.map(({ offsetUrl, config }) => {
     return fetch(offsetUrl, config);
   });
@@ -166,7 +166,7 @@ const getFileName = async (access_token: string, user_id: string): Promise<strin
     const data: { display_name: string } = await response.json();
     // Get the display_name
     const displayName = data['display_name'];
-    const displayNameUTF8 = JSON.parse( JSON.stringify( displayName ) );
+    const displayNameUTF8 = parseStringToUTF8(displayName);
     // Use the user_id as xlsx_file_name
     let xlsxFileName = user_id;
     // However, if display_name is a non-empty string, use the display_name as xlsx_file_name
@@ -222,18 +222,21 @@ const writeSheets = (user_playlists_map: Map<string, TPlaylistTracks>, playlist_
     return;
   }
 
+  const worksheetNames = new Set<string>();
   // If there is at least one playlist
   user_playlists_map.forEach((userPlaylist) => {
     const tracks = userPlaylist['items'];
-    const playlistId = getIdFromUrl(userPlaylist['href']);
-    const playlistName = playlist_names[playlistId];
+    const playlistId = parseStringToUTF8(getIdFromUrl(userPlaylist['href']));
+    const playlistName = parseStringToUTF8(playlist_names[playlistId]);
+    const worksheetName = parseWorksheetName(playlistName,worksheetNames);
+    worksheetNames.add(worksheetName);
     const playlstUrl = `https://open.spotify.com/playlist/${playlistId}`;
     if(tracks.length > 0) {
       // Add Worksheets to the workbook
-      let ws = wb.addWorksheet(playlistName);
+      let ws = wb.addWorksheet(worksheetName);
 
-      // Set value of cells A1:A4 to playlist_name styled with paramaters of style
-      ws.cell(1,1,1,4,true).string(playlistName).style(headerStyle);
+      // Set value of cells A1:A6 to playlist_name styled with paramaters of style
+      ws.cell(1,1,1,6,true).string(playlistName).style(headerStyle);
 
       // Set style to playlist url
       ws.cell(2,1).string('Playlist URL:').style(normalStyle);
@@ -250,19 +253,19 @@ const writeSheets = (user_playlists_map: Map<string, TPlaylistTracks>, playlist_
       let trackRow = 4;
       // Set value of songs to cells and style them with paramaters of style
       tracks.forEach( track => {
-        const song = track['track']['name'];    
+        const song = parseStringToUTF8(track['track']['name']);    
         const artist = track['track']['artists']
           .map((artist) => {
-            return artist['name'];
+            return parseStringToUTF8(artist['name']);
           }).join('; ');
         const album = track['track']['album'];
-        const albumUrl = album['external_urls']['spotify'];
-        const albumName = album['name'];
-        const trackUrl = track['track']['external_urls']['spotify'];
-        const addedAt = track['added_at'];
+        const albumUrl = parseStringToUTF8(album['external_urls']['spotify']);
+        const albumName = parseStringToUTF8(album['name']);
+        const trackUrl = parseStringToUTF8(track['track']['external_urls']['spotify']);
+        const addedAt = parseStringToUTF8(track['added_at']);
         const addedBy = track['added_by'];
-        const addedByUrl = addedBy['external_urls']['spotify']
-        const addedById = addedBy['id'];
+        const addedByUrl = parseStringToUTF8(addedBy['external_urls']['spotify']);
+        const addedById = parseStringToUTF8(addedBy['id']);
         const addedByTooltip = `Added by Spotify id ${addedById}`; 
         ws.cell(trackRow,1).string(artist).style(normalStyle);
         ws.cell(trackRow,2).string(song).style(normalStyle);
