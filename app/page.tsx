@@ -1,5 +1,5 @@
 'use client';
-import { SyntheticEvent } from 'react';
+import { SyntheticEvent, useEffect } from 'react';
 import { ChangeEvent, MouseEvent, useState } from 'react'
 import { SpotifyHome } from '@/components/SpotifyHome';
 import { Login } from '@/components/Login';
@@ -11,20 +11,57 @@ export default function Home() {
   const {status} = useSession();
 
   const [accountChecked, setAccountChecked] = useState<'own' | 'other'>('own');
-  const [inputError, setInputError] = useState(false);
+  const [errorType, setErrorType] = useState<'input' | 'forbidden' | null>('forbidden');
   const [otherSpotifyUserId, setOtherSpotifyUserId] = useState<string>('');
   const [modal, setModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect( () => {
+    if(status === 'authenticated') {
+      setIsLoading(true);
+      const baseUrl = `${window.location.href}`;
+      const urlToVerifyAccount = `${baseUrl}api/verifyPermission`;
+      const fetchData = async () => {
+        const playlistResponse = await fetch(urlToVerifyAccount, {
+          method: 'POST', // *GET, POST, PUT, DELETE, etc.
+          mode: 'cors', // no-cors, *cors, same-origin
+          cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+          credentials: 'same-origin', // include, *same-origin, omit
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          redirect: 'follow', // manual, *follow, error
+          referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+        });
+        if(playlistResponse.status !== 200) {
+          throw new Error('Forbidden.');
+        }
+        setErrorMessage('');
+        setErrorType(null);
+        setAlertMessage('');
+        setModal(false);
+        setIsLoading(false);
+      };
+      fetchData()
+        .catch((error) => {
+          setErrorMessage('You do not have permission to continue. Please, contact the administrator.');
+          setErrorType('forbidden');
+          setAlertMessage('You do not have permission to continue. Please, contact the administrator.');
+          setModal(true);
+          setIsLoading(false);
+        });
+    }
+  }, [status]);
   const handleOptionChange = (ev: SyntheticEvent<Element, Event>) => {
     setAccountChecked((ev.target as HTMLInputElement).value as 'own' | 'other');
-    setInputError(false);
+    setErrorType(null);
   };
 
   const handleOtherSpotifyUserIdChange = (ev: ChangeEvent<HTMLInputElement>) => {
     setOtherSpotifyUserId(ev.target.value);
-    setInputError(false);
+    setErrorType(null);
   };
 
   const toggleModal = () => {
@@ -33,8 +70,9 @@ export default function Home() {
 
   const handleLogout = (ev: MouseEvent<HTMLSpanElement, globalThis.MouseEvent> | MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>) => {
     setOtherSpotifyUserId('');
+    setAlertMessage('');
     setErrorMessage('');
-    setInputError(false);
+    setErrorType(null);
     signOut();
   };
 
@@ -67,11 +105,16 @@ export default function Home() {
         if('error' in errorDetail &&
          'errorDetails' in errorDetail &&
          'message' in errorDetail.errorDetails &&
-         'item' in errorDetail.errorDetails &&
+         'type' in errorDetail.errorDetails &&
          typeof errorDetail.errorDetails.message === 'string'
         ) {
           setErrorMessage(errorDetail.errorDetails.message);
-          setInputError(true);
+          setAlertMessage(errorDetail.errorDetails.message);
+          if(errorDetail.errorDetails.type === 'input') {
+            setErrorType('input');
+          } else if(errorDetail.errorDetails.type === 'forbidden') {
+            setErrorType('forbidden');
+          }
         } else {
           setErrorMessage('There was a problem downloading the XLSX file');
         }
@@ -82,7 +125,8 @@ export default function Home() {
       const playlistName = playlistResponse.headers.get('Content-Disposition')?.split('filename=')[1];
       const playlistXLSX = await playlistResponse.blob();
       saveAs(playlistXLSX, playlistName);
-      setInputError(false);
+      setErrorType(null);
+      setAlertMessage('');
     } catch(error) {
       setErrorMessage('There was a problem processing the XLSX file');
       toggleModal();
@@ -187,7 +231,8 @@ export default function Home() {
             otherSpotifyUserId={otherSpotifyUserId}
             accountChecked={accountChecked}
             isLoading={isLoading}
-            inputError={inputError}
+            alertMessage={alertMessage}
+            errorType={errorType}
             handleOptionChange={handleOptionChange}
             handleOtherSpotifyUserIdChange={handleOtherSpotifyUserIdChange}
             handleClickButton={handleClickButton}
