@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { TJsonError, TPlaylist, TPlaylists, TPlaylistTracks } from 'types/types';
+import { TJsonError, TPlaylist, TPlaylists, TPlaylistTracks } from '@/types/types';
 import { assertIsJsonError, getErrorMessage } from '@/utils/errorHandler';
 import { getSession } from 'next-auth/react';
 import xl, { Workbook } from 'excel4node';
 import { getMongoDb } from '@/lib/mongodb';
 import { findAccountById } from '@/lib/db/account';
 import AccountModel from '@/lib/models/AccountModel';
-import { getAccessAndRefreshToken, updateAccountToken, verifySpotifyUserExists } from '@/utils/index';
+import { refreshSpotifyToken, createSpotifyUserExistsJSON } from '@/utils/index';
 
 /**
  * Summary. Function that returns a promise with an array of playlists from an spotify account.
@@ -386,32 +386,21 @@ export default async function handler(
     if(diffDate < 1000) {
       const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
       const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-      if(typeof(spotifyClientId) !== 'string' || spotifyClientId.trim() === '') {
-        throw new Error('Spotify Client Id not setted.');
+
+      const accessTokenResponse = await refreshSpotifyToken(db, userId, spotifyClientId, spotifyClientSecret, account.refresh_token);
+      if(typeof accessTokenResponse !== 'string') {
+        throw accessTokenResponse;
       }
-      if(typeof(spotifyClientSecret) !== 'string' || spotifyClientSecret.trim() === '') {
-        throw new Error('Spotify Client Secret not setted.');
-      }
-      const { newAccessToken, newRefreshToken, newExpirationDate } = await getAccessAndRefreshToken(account.refresh_token, spotifyClientId, spotifyClientSecret);
-      if(!newExpirationDate) {
-        throw new Error('Token was not refreshed.');
-      }
-      const refreshToken = newRefreshToken ?? account.refresh_token;
-      const tokenUpdated = await updateAccountToken(db, userId, newAccessToken, refreshToken, newExpirationDate);
-      if(!tokenUpdated) {
-        throw new Error('There was an error updating user in the database.');
-      }
-      validatedAccessToken = newAccessToken;
+      validatedAccessToken = accessTokenResponse;
     }
     // If the request is for other spotify user
-    if(typeof spotifyId === 'string' && spotifyId.trim() !== '') {
-      // Check if other user exists
-      const spotifyUserExists = await verifySpotifyUserExists(validatedAccessToken, spotifyId);
-      if(!spotifyUserExists) {
-        return res.status(400).json({ error: `There was a problem with the account.`, errorDetails: { message: 'Invalid spotify id.', item: 'input' }});
-      }
-    } else {
+    if(typeof spotifyId !== 'string' || spotifyId.trim() === '') {
       spotifyId = account.providerAccountId;
+    }
+    /* Verify if user has Spotify API permission to continue */
+    const spotifyUserExists = await createSpotifyUserExistsJSON(validatedAccessToken, spotifyId);
+    if(spotifyUserExists.status !== 200) {
+      return res.status(spotifyUserExists.status).json(spotifyUserExists.json);
     }
     const response = await getListOfPlaylists(accessToken, spotifyId);
     if(assertIsJsonError(response)) {

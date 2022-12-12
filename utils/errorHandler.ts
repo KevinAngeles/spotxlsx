@@ -1,4 +1,4 @@
-import { TErrorWithMessage } from "types/types";
+import { TErrorWithMessage } from '@/types/types';
 
 const isErrorWithMessage = (error: unknown): error is TErrorWithMessage => {
   return (

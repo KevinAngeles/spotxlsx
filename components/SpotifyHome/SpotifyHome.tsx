@@ -1,5 +1,5 @@
 import { ChangeEventHandler, MouseEventHandler, SyntheticEvent } from 'react';
-import { Box, Button, CircularProgress, TextField } from '@mui/material';
+import { Alert, AlertTitle, Box, Button, CircularProgress, TextField } from '@mui/material';
 import { RadioGroupCustom, RadioGroupCustomOptions } from '@/components/RadioGroupCustom';
 import Person from '@mui/icons-material/Person';
 import People from '@mui/icons-material/People';
@@ -8,7 +8,8 @@ type SpotifyHomeProps = {
   otherSpotifyUserId: string;
   accountChecked: string;
   isLoading: boolean;
-  inputError: boolean;
+  alertMessage: string;
+  errorType: 'input' | 'forbidden' | null;
   handleOptionChange: (ev: SyntheticEvent<Element, Event>) => void;
   handleOtherSpotifyUserIdChange: ChangeEventHandler<HTMLInputElement>;
   handleClickButton: MouseEventHandler<HTMLButtonElement>;
@@ -18,7 +19,8 @@ const SpotifyHome = ({
   otherSpotifyUserId,
   accountChecked,
   isLoading,
-  inputError,
+  alertMessage,
+  errorType,
   handleOptionChange,
   handleOtherSpotifyUserIdChange,
   handleClickButton,
@@ -45,6 +47,7 @@ const SpotifyHome = ({
       <RadioGroupCustom
         groupLabel='Select Source:'
         defaultValue='own'
+        disabled={errorType === 'forbidden'}
         options={radioOptions}
         handleOptionChange={handleOptionChange}
       />
@@ -59,7 +62,8 @@ const SpotifyHome = ({
             label='Spotify Id'
             variant='outlined'
             value={otherSpotifyUserId}
-            error={inputError}
+            error={errorType === 'input'}
+            disabled={errorType === 'forbidden'}
             onChange={handleOtherSpotifyUserIdChange}
           />
         )
@@ -69,7 +73,7 @@ const SpotifyHome = ({
         type='button'
         color='primary'
         size='medium'
-        disabled={accountChecked === 'other' && otherSpotifyUserId.trim() === '' || isLoading}
+        disabled={accountChecked === 'other' && otherSpotifyUserId.trim() === '' || isLoading || errorType === 'forbidden'}
         variant='contained'
         onClick={handleClickButton}
       >
@@ -87,8 +91,16 @@ const SpotifyHome = ({
           (isLoading) && (<CircularProgress />)
         }
       </Box>
+      {
+        ((errorType === 'forbidden' || errorType === 'input') && alertMessage.trim() !== '') && (
+          <Alert severity='error'>
+            <AlertTitle>Error</AlertTitle>
+            {alertMessage}
+          </Alert>
+        )
+      }
     </Box>
   );
-}
+};
 
 export default SpotifyHome;

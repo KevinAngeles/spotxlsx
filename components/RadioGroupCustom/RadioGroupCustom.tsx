@@ -11,7 +11,8 @@ export type RadioGroupCustomOptions = {
 type RadioGroupCustomProps = {
   groupLabel: string;
   defaultValue: 'own' | 'other';
-  options: RadioGroupCustomOptions[],
+  options: RadioGroupCustomOptions[];
+  disabled: boolean;
   handleOptionChange: (ev: SyntheticEvent<Element, Event>) => void;
 };
 
@@ -28,27 +29,18 @@ const RadioGroupLabel = ({label, icon}: RadioGroupLabelProps) => {
   )
 };
 
-const style = {
-  formLabel: {
-    color: '#000',
-    '&.Mui-focused': {
-      color: "#000"
-    }
-  }
-};
-
-
 const RadioGroupCustom = ({
   groupLabel,
   defaultValue,
   options,
+  disabled,
   handleOptionChange
 }: RadioGroupCustomProps) => {
   return (
     <FormControl>
       <FormLabel
         component='h2'
-        id='demo-radio-buttons-group-label'
+        id='radio-buttons-group-label'
         sx={{
           color: '#000',
           margin: 0,
@@ -62,7 +54,7 @@ const RadioGroupCustom = ({
         {groupLabel}
       </FormLabel>
       <RadioGroup
-        aria-labelledby='demo-radio-buttons-group-label'
+        aria-labelledby='radio-buttons-group-label'
         defaultValue={defaultValue}
         name='radio-buttons-group'
       >
@@ -74,6 +66,7 @@ const RadioGroupCustom = ({
                 value={value}
                 control={<Radio />}
                 onChange={handleOptionChange}
+                disabled={disabled}
                 label={<RadioGroupLabel label={label} icon={icon} />}
               />
             );

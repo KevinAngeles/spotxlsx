@@ -1,4 +1,4 @@
-import { ObjectId, Db, InsertOneResult } from 'mongodb';
+import { ObjectId } from 'mongodb';
 
 export type TPlaylists = {
   href: string;
@@ -44,7 +44,7 @@ export type TPlaylist = {
   tracks: {
     href: string;
     total: number;
-  },
+  };
   type: string;
   uri: string;
 }
@@ -58,22 +58,34 @@ export type TJsonError = {
   error: TErrorWithMessage;
 }
 
+export type TJsonStatus = {
+  status: number;
+  json: {
+    message?: string;
+    error?: string;
+    errorDetails?: {
+      message: string;
+      type: 'input' | 'forbidden';
+    };
+  };
+}
+
 export type TTrack = {
   added_at: string;
   added_by: {
     external_urls: {
       spotify: string;
-    },
+    };
     href: string;
     id: string;
     type: string;
     uri: string;
   };
-  is_local: boolean,
-  primary_color: string | null,
+  is_local: boolean;
+  primary_color: string | null;
   track: {
     album: {
-      album_type: string | null,
+      album_type: string | null;
       artists: {
         external_urls: {
           spotify?: string;
@@ -97,8 +109,8 @@ export type TTrack = {
       }[];
       name: string;
       release_date: string | null;
-      release_date_precision: string | null,
-      total_tracks?: number,
+      release_date_precision: string | null;
+      total_tracks?: number;
       type: string;
       uri: string | null;
     };
