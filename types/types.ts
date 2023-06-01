@@ -145,7 +145,7 @@ export type TTrack = {
     track_number: number;
     type: string;
     uri: string;
-  };
+  } | null;
   video_thumbnail: {
     url: string | null;
   };

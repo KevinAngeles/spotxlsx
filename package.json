@@ -1,6 +1,6 @@
 {
   "name": "spotxlsx",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Application that retrieves an excel file filled with playlists and their respective tracks gathered from an Spotify account.",
   "engines": {
     "node": "^18.0.0",
