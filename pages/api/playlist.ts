@@ -6,7 +6,7 @@ import { getMongoDb } from '@/lib/mongodb';
 import { findAccountById } from '@/lib/db/account';
 import AccountModel from '@/lib/models/AccountModel';
 import { refreshSpotifyToken, createSpotifyUserExistsJSON, parseStringToUTF8, parseWorksheetName } from '@/utils/index';
-import xl, { Workbook } from 'excel4node';
+import xl, { Workbook, Worksheet } from 'excel4node';
 
 /**
  * Summary. Function that returns a promise with an array of playlists from an spotify account.
@@ -19,9 +19,10 @@ import xl, { Workbook } from 'excel4node';
  *
  * @return {Promise<[TPlaylists | TJsonError]>}
  */
-const getListOfPlaylists = async (access_token: string, user_id?: string): Promise<TPlaylists | TJsonError> => {
+const getListOfPlaylists = async (access_token: string, offset: number, user_id?: string): Promise<TPlaylists | TJsonError> => {
   const spotifyId = user_id ?? 'me';
-  const getPlaylistsUrl = `https://api.spotify.com/v1/users/${spotifyId}/playlists`;
+  const queryParameters = new URLSearchParams({limit: '50', offset: `${offset}`});
+  const getPlaylistsUrl = `https://api.spotify.com/v1/users/${spotifyId}/playlists?${queryParameters}`;
   try {
     const response = await fetch(getPlaylistsUrl, {
       method: 'GET',
@@ -31,12 +32,12 @@ const getListOfPlaylists = async (access_token: string, user_id?: string): Promi
         'Authorization': `Bearer ${access_token}`
       }
     });
-    if(response.status === 401) {
-      const errorJson = await response.json();
+  if(response.status === 401) {
+    const errorJson = await response.json();
       return errorJson;
     }
     if(response.status !== 200) {
-      return { error: { status: response.status, message: 'Error while fetching playlists'}};
+    return { error: { status: response.status, message: 'Error while fetching playlists'}};
     }
     const playlists: TPlaylists = await response.json();
     return playlists;
@@ -251,8 +252,11 @@ const writeSheets = (user_playlists_map: Map<string, TPlaylistTracks>, playlist_
       ws.cell(3,6).string('Added by').style(headerStyle);
 
       let trackRow = 4;
-      // Set value of songs to cells and style them with paramaters of style
+        // Set value of songs to cells and style them with paramaters of style
       tracks.forEach( track => {
+        if(!track || !track['track']) {
+          return;
+        }
         const song = parseStringToUTF8(track['track']['name']);    
         const artist = track['track']['artists']
           .map((artist) => {
@@ -307,13 +311,27 @@ const writeSheets = (user_playlists_map: Map<string, TPlaylistTracks>, playlist_
  */
 const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: Workbook, res: NextApiResponse) => {
   try {
-    const playlists = await getListOfPlaylists(access_token, user_id);
+    const playlists = await getListOfPlaylists(access_token, 0, user_id);
     if(assertIsJsonError(playlists)) {
       const jsonError = playlists as TJsonError;
       const jsonErrorStatus = jsonError['error']['status'] ?? 400;
       return res.status(jsonErrorStatus).json(playlists);
     }
-    const playlistTracks = (playlists as TPlaylists)['items'];
+    let playlistTracks = (playlists as TPlaylists)['items'];
+    let playlistOffset = playlistTracks.length;
+    const totalNumberOfPlaylists = (playlists as TPlaylists)['total'];
+    // If there is more than 50 playlists, retrieve more playlists
+    while(playlistOffset < totalNumberOfPlaylists) {
+      const temporalPlaylists = await getListOfPlaylists(access_token, playlistOffset, user_id);
+      if(assertIsJsonError(temporalPlaylists)) {
+        const jsonError = temporalPlaylists as TJsonError;
+        const jsonErrorStatus = jsonError['error']['status'] ?? 400;
+        return res.status(jsonErrorStatus).json(temporalPlaylists);
+      }
+      const additionalPlaylistTracks = (temporalPlaylists as TPlaylists)['items'];
+      playlistTracks = [...playlistTracks,...additionalPlaylistTracks];
+      playlistOffset += additionalPlaylistTracks.length;
+    }
     const { playlistsRequestPromises, playlistNames } = await getRequestsPromisesAndNamesForEachPlaylist(access_token, playlistTracks, user_id);
     const userPlaylistsMap = new Map<string, TPlaylistTracks>();
     const playlistResponses = await Promise.all(playlistsRequestPromises);
@@ -403,17 +421,16 @@ export default async function handler(
     /* Verify if user has Spotify API permission to continue */
     const spotifyUserExists = await createSpotifyUserExistsJSON(validatedAccessToken, spotifyId);
     if(spotifyUserExists.status !== 200) {
-      return res.status(spotifyUserExists.status).json(spotifyUserExists.json);
+    return res.status(spotifyUserExists.status).json(spotifyUserExists.json);
     }
-    const response = await getListOfPlaylists(accessToken, spotifyId);
+    const response = await getListOfPlaylists(accessToken, 0, spotifyId);
     if(assertIsJsonError(response)) {
       const errorResponse = response as TJsonError;
       const errorStatus = errorResponse.error.status ?? 400;
       const errorMessage = errorResponse.error.message;
-      return res.status(errorStatus).json({ error: errorMessage });
+    return res.status(errorStatus).json({ error: errorMessage });
     }
     const wb = new xl.Workbook();
-  
     await getPlaylistsAndExport(validatedAccessToken, spotifyId, wb, res);
   } catch(error) {
     const errorMessage = getErrorMessage(error);
