@@ -85,6 +85,7 @@ export default function Home() {
     }
 
     const params = new URLSearchParams({
+      value: accountChecked,
       spotifyId: userSpotifyId,
     });
     const urlToDownloadXLSX = `${baseUrl}api/playlist?${params}`;
