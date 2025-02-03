@@ -2,18 +2,20 @@ import { findAccountById } from '@/lib/db/account';
 import AccountModel from '@/lib/models/AccountModel';
 import { getMongoDb } from '@/lib/mongodb';
 import { createSpotifyUserExistsJSON, getErrorMessage, refreshSpotifyToken } from '@/utils/index';
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export const POST = async (
+  req: NextRequest
+) => {
   try {
-    const session = await getSession({ req });
+    const session = await auth();
     const userId = session?.user?._id;
     if(typeof userId !== 'string') {
-      return res.status(400).json({ error: `There was a problem with the session.` });
+      return new NextResponse(
+        JSON.stringify({ error: `There was a problem with the session.` }),
+        { status: 400 }
+      );
     }
     const db = await getMongoDb();
     const account: AccountModel | null = await findAccountById(db, userId);
@@ -24,7 +26,10 @@ export default async function handler(
       !account.providerAccountId ||
       !account.expires_at
     ) {
-      return res.status(400).json({ error: `There was a problem with the account.` });
+      return new NextResponse(
+        JSON.stringify({ error: `There was a problem with the account.` }),
+        { status: 400 }
+      );
     }
     const accessToken = account.access_token;
     const currentDate = Date.now();
@@ -35,8 +40,8 @@ export default async function handler(
 
     // verifyTokenAndGetAccessToken
     if(diffDate < 1000) {
-      const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
-      const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+      const spotifyClientId = process.env.AUTH_SPOTIFY_ID;
+      const spotifyClientSecret = process.env.AUTH_SPOTIFY_SECRET;
       const accessTokenResponse = await refreshSpotifyToken(db, userId, spotifyClientId, spotifyClientSecret, account.refresh_token);
       if(typeof accessTokenResponse !== 'string') {
         throw accessTokenResponse;
@@ -45,9 +50,15 @@ export default async function handler(
     }
     /* Verify if user has Spotify API permission to continue */
     const spotifyUserExists = await createSpotifyUserExistsJSON(validatedAccessToken, spotifyAccountId);
-    return res.status(spotifyUserExists.status).json(spotifyUserExists.json);
+    return new NextResponse(
+      JSON.stringify(spotifyUserExists.json),
+      { status: spotifyUserExists.status }
+    );
   } catch(error) {
     const errorMessage = getErrorMessage(error);
-    return res.status(400).json({ error: errorMessage });
+    return new NextResponse(
+      JSON.stringify({ error: errorMessage }),
+      { status: 400 }
+    );
   }
 }

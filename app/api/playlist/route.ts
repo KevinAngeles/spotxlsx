@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest, NextResponse } from 'next/server';
 import { TJsonError, TPlaylist, TPlaylists, TPlaylistTracks } from '@/types/types';
 import { assertIsJsonError, getErrorMessage } from '@/utils/errorHandler';
-import { getSession } from 'next-auth/react';
+import { auth } from '@/auth';
 import { getMongoDb } from '@/lib/mongodb';
 import { findAccountById } from '@/lib/db/account';
 import AccountModel from '@/lib/models/AccountModel';
@@ -32,17 +33,17 @@ const getListOfPlaylists = async (access_token: string, offset: number, user_id?
         'Authorization': `Bearer ${access_token}`
       }
     });
-  if(response.status === 401) {
-    const errorJson = await response.json();
+    if(response.status === 401) {
+      const errorJson = await response.json();
       return errorJson;
     }
     if(response.status !== 200) {
-    return { error: { status: response.status, message: 'Error while fetching playlists'}};
+      return { error: { status: response.status, message: 'Error while fetching playlists'}};
     }
     const playlists: TPlaylists = await response.json();
     return playlists;
   } catch (error) {
-  throw error;
+    throw error;
   }
 };
 
@@ -309,13 +310,16 @@ const writeSheets = (user_playlists_map: Map<string, TPlaylistTracks>, playlist_
  * @param {Object}    res                Response Object.
  * 
  */
-const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: Workbook, res: NextApiResponse) => {
+const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: Workbook, res: NextResponse) => {
   try {
     const playlists = await getListOfPlaylists(access_token, 0, user_id);
     if(assertIsJsonError(playlists)) {
       const jsonError = playlists as TJsonError;
       const jsonErrorStatus = jsonError['error']['status'] ?? 400;
-      return res.status(jsonErrorStatus).json(playlists);
+      return new NextResponse(
+        JSON.stringify(playlists),
+        { status: jsonErrorStatus }
+      );
     }
     let playlistTracks = (playlists as TPlaylists)['items'];
     let playlistOffset = playlistTracks.length;
@@ -326,7 +330,10 @@ const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: 
       if(assertIsJsonError(temporalPlaylists)) {
         const jsonError = temporalPlaylists as TJsonError;
         const jsonErrorStatus = jsonError['error']['status'] ?? 400;
-        return res.status(jsonErrorStatus).json(temporalPlaylists);
+        return new NextResponse(
+          JSON.stringify(temporalPlaylists),
+          { status: jsonErrorStatus }
+        );
       }
       const additionalPlaylistTracks = (temporalPlaylists as TPlaylists)['items'];
       playlistTracks = [...playlistTracks,...additionalPlaylistTracks];
@@ -336,7 +343,7 @@ const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: 
     const userPlaylistsMap = new Map<string, TPlaylistTracks>();
     const playlistResponses = await Promise.all(playlistsRequestPromises);
     const playlistsTracks: TPlaylistTracks[] = await Promise.all(playlistResponses.map(playlistResponse => {
-      if(playlistResponse.status !== 200){
+      if(playlistResponse.status !== 200) {
         throw Error(`There was a problem with request`);
       }
       return playlistResponse.json();
@@ -359,9 +366,11 @@ const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: 
 
     if(typeof xlsxFileName === 'string') {
       const buffer = await wb.writeToBuffer();
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-disposition', `attachment; filename=${xlsxFileName}`);
-      return res.end(buffer);
+      let headers = {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-disposition': `attachment; filename=${xlsxFileName}`
+      }
+      return new NextResponse(buffer,{ headers });
     } else {
       throw xlsxFileName;
     }
@@ -371,43 +380,58 @@ const getPlaylistsAndExport = async (access_token: string, user_id: string, wb: 
   }
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export const GET = async (
+  req: NextRequest
+) => {
   if(req.method !== 'GET') {
-    return res.status(400).json({ error: `Unauthorized method` });
+    return new NextResponse(
+      JSON.stringify({ error: `Unauthorized method` }),
+      { status: 400 }
+    );
   }
-
   try {
-    const session = await getSession({ req });
+    // const session = await getSession({ req });
+    const session = await auth();
     const userId = session?.user?._id;
     if(typeof userId !== 'string') {
-      return res.status(400).json({ error: `There was a problem with the session.` });
+      return new NextResponse(
+        JSON.stringify({ error: `There was a problem with the session.` }),
+        { status: 400 }
+      );
     }
     const db = await getMongoDb();
     const account: AccountModel | null = await findAccountById(db, userId);
-
+    
     if(!account ||
       !account.access_token ||
       !account.refresh_token ||
       !account.providerAccountId ||
       !account.expires_at
     ) {
-      return res.status(400).json({ error: `There was a problem with the account.` });
+      return new NextResponse(
+        JSON.stringify({ error: `There was a problem with the account.` }),
+        { status: 400 }
+      );
     }
     const accessToken = account.access_token;
-    let { spotifyId } = req.query;
+    let accountOwnerType = req.nextUrl.searchParams.get('value');
+    if (accountOwnerType !== 'own' && accountOwnerType !== 'other') {
+      return new NextResponse(
+        JSON.stringify({ error: `There was a problem defining the account owner type.` }),
+        { status: 400 }
+      );
+    }
+    let isMyAccount = (req.nextUrl.searchParams.get('value') === 'own');
+    let spotifyId = isMyAccount ? account.providerAccountId : req.nextUrl.searchParams.get('spotifyId');
     const currentDate = Date.now();
     const tokenExpirationDate = account.expires_at;
     const diffDate = tokenExpirationDate - currentDate;
     let validatedAccessToken = accessToken;
-
+    
     // verifyTokenAndGetAccessToken
     if(diffDate < 1000) {
-      const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
-      const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
+      const spotifyClientId = process.env.AUTH_SPOTIFY_ID;
+      const spotifyClientSecret = process.env.AUTH_SPOTIFY_SECRET;
       const accessTokenResponse = await refreshSpotifyToken(db, userId, spotifyClientId, spotifyClientSecret, account.refresh_token);
       if(typeof accessTokenResponse !== 'string') {
         throw accessTokenResponse;
@@ -421,19 +445,29 @@ export default async function handler(
     /* Verify if user has Spotify API permission to continue */
     const spotifyUserExists = await createSpotifyUserExistsJSON(validatedAccessToken, spotifyId);
     if(spotifyUserExists.status !== 200) {
-    return res.status(spotifyUserExists.status).json(spotifyUserExists.json);
+      return new NextResponse(
+        JSON.stringify(spotifyUserExists.json),
+        { status: spotifyUserExists.status }
+      );
     }
     const response = await getListOfPlaylists(accessToken, 0, spotifyId);
     if(assertIsJsonError(response)) {
       const errorResponse = response as TJsonError;
       const errorStatus = errorResponse.error.status ?? 400;
       const errorMessage = errorResponse.error.message;
-    return res.status(errorStatus).json({ error: errorMessage });
+      return new NextResponse(
+        JSON.stringify({ error: errorMessage }),
+        { status: errorStatus }
+      );
     }
     const wb = new xl.Workbook();
-    await getPlaylistsAndExport(validatedAccessToken, spotifyId, wb, res);
+    const res = await getPlaylistsAndExport(validatedAccessToken, spotifyId, wb, NextResponse.next());
+    return res;
   } catch(error) {
     const errorMessage = getErrorMessage(error);
-    return res.status(400).json({ error: errorMessage });
+    return new NextResponse(
+      JSON.stringify({ error: errorMessage }),
+      { status: 400 }
+    );
   }
 }

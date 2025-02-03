@@ -1,5 +1,6 @@
 import { Box, Button, Typography } from '@mui/material';
 import { MouseEventHandler } from 'react';
+import { signIn } from "next-auth/react";
 
 type LoginProps = {
   handleLogin: MouseEventHandler<HTMLButtonElement>;
@@ -40,7 +41,7 @@ const Login = ({
         size='medium'
         id='btnLogin'
         variant='contained'
-        onClick={handleLogin}
+        onClick={() => signIn("spotify")}
       >
         Login to Spotify
       </Button>
